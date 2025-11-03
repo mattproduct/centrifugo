@@ -28,3 +28,5 @@ vendor/
 *.orig
 tmp/
 .rocks/
+/test_*.js
+node_modules/

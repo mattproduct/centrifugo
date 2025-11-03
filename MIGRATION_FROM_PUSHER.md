@@ -398,68 +398,169 @@ export default {
 4. **Validate user permissions** - Check channel access on backend before generating token
 5. **Use HTTPS/WSS** - Always use secure connections in production
 
-## Environment Variables
+## Environment Variables (Vue 1 / Webpack)
 
-### Development (.env.local)
+### 1. Install dotenv
 
-Create a `.env.local` file in your Vue.js project root:
-
-```env
-VITE_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
-VITE_CENTRIFUGO_SECRET=Biyo_1_Secret_2025!
-VITE_API_URL=https://your-backend-api.com
+```bash
+npm install dotenv --save-dev
 ```
 
-### Production (.env.production)
+### 2. Create `.env` file
 
-Create a `.env.production` file:
+Create a `.env` file in your Vue.js project root:
 
 ```env
-VITE_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
-VITE_CENTRIFUGO_SECRET=your_production_secret
-VITE_API_URL=https://your-production-api.com
+VUE_APP_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
+VUE_APP_CENTRIFUGO_SECRET=Biyo_1_Secret_2025!
+VUE_APP_API_URL=https://your-backend-api.com
 ```
 
-### Add to .gitignore
+### 3. Create `.env.production` for production
+
+```env
+VUE_APP_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
+VUE_APP_CENTRIFUGO_SECRET=your_production_secret
+VUE_APP_API_URL=https://your-production-api.com
+```
+
+### 4. Add to .gitignore
 
 Make sure your `.gitignore` includes:
 
 ```
+.env
 .env.local
 .env.*.local
 ```
 
 This prevents accidental commits of secrets.
 
-### Using in Your Service
+### 5. Update your service to use environment variables
 
-The service automatically uses these variables:
-
-```javascript
-const CENTRIFUGO_URL = import.meta.env.VITE_CENTRIFUGO_URL;
-const SECRET = import.meta.env.VITE_CENTRIFUGO_SECRET;
-```
-
-### Vite Configuration (vite.config.js)
-
-If you need to access environment variables in your Vite config:
+Update `src/services/centrifugo.js`:
 
 ```javascript
-import { defineConfig, loadEnv } from 'vite';
-import vue from '@vitejs/plugin-vue';
+import { Centrifuge } from 'centrifuge';
 
-export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  
-  return {
-    plugins: [vue()],
-    define: {
-      __CENTRIFUGO_URL__: JSON.stringify(env.VITE_CENTRIFUGO_URL),
-      __CENTRIFUGO_SECRET__: JSON.stringify(env.VITE_CENTRIFUGO_SECRET),
+const CENTRIFUGO_URL = process.env.VUE_APP_CENTRIFUGO_URL;
+const SECRET = process.env.VUE_APP_CENTRIFUGO_SECRET;
+
+class CentrifugoService {
+  constructor() {
+    this.centrifuge = null;
+    this.token = null;
+  }
+
+  async init(userId, userData = {}) {
+    const token = await this.generateToken(userId, userData);
+    
+    this.centrifuge = new Centrifuge(CENTRIFUGO_URL, {
+      token: token,
+      debug: process.env.NODE_ENV === 'development'
+    });
+
+    this.centrifuge.on('connected', () => {
+      console.log('✓ Connected to Centrifugo');
+    });
+
+    this.centrifuge.on('disconnected', (ctx) => {
+      console.log('✗ Disconnected from Centrifugo:', ctx.reason);
+    });
+
+    this.centrifuge.on('error', (ctx) => {
+      console.error('✗ Centrifugo error:', ctx.error);
+    });
+
+    this.centrifuge.connect();
+  }
+
+  async generateToken(userId, userData = {}) {
+    // In production, call your backend API to generate the token
+    const response = await fetch(process.env.VUE_APP_API_URL + '/api/centrifugo-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...userData })
+    });
+    const data = await response.json();
+    return data.token;
+  }
+
+  subscribe(channel, onMessage) {
+    const sub = this.centrifuge.getSubscription(channel);
+    
+    if (!sub) {
+      const newSub = this.centrifuge.newSubscription(channel);
+      
+      newSub.on('publication', (ctx) => {
+        console.log('Message received:', ctx.data);
+        onMessage(ctx.data);
+      });
+
+      newSub.on('subscribed', () => {
+        console.log(`✓ Subscribed to channel: ${channel}`);
+      });
+
+      newSub.on('error', (ctx) => {
+        console.error(`✗ Subscription error on ${channel}:`, ctx.error);
+      });
+
+      newSub.subscribe();
+      return newSub;
     }
-  };
-});
+    
+    return sub;
+  }
+
+  unsubscribe(channel) {
+    const sub = this.centrifuge.getSubscription(channel);
+    if (sub) {
+      sub.unsubscribe();
+    }
+  }
+
+  disconnect() {
+    if (this.centrifuge) {
+      this.centrifuge.disconnect();
+    }
+  }
+}
+
+export default new CentrifugoService();
 ```
+
+### 6. Webpack Configuration (vue.config.js)
+
+If you have a `vue.config.js`, you can optionally configure dotenv:
+
+```javascript
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+module.exports = {
+  configureWebpack: {
+    plugins: [
+      new webpack.DefinePlugin({
+        'process.env.VUE_APP_CENTRIFUGO_URL': JSON.stringify(process.env.VUE_APP_CENTRIFUGO_URL),
+        'process.env.VUE_APP_CENTRIFUGO_SECRET': JSON.stringify(process.env.VUE_APP_CENTRIFUGO_SECRET),
+      })
+    ]
+  }
+};
+```
+
+### 7. Run your app
+
+```bash
+# Development
+npm run serve
+
+# Production
+npm run build
+```
+
+Vue CLI automatically loads `.env` and `.env.production` files based on the environment.
 
 ## Troubleshooting
 

@@ -19,8 +19,8 @@ Create a new file `src/services/centrifugo.js`:
 ```javascript
 import { Centrifuge } from 'centrifuge';
 
-const CENTRIFUGO_URL = 'wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket';
-const SECRET = 'Biyo_1_Secret_2025!'; // Your secret key
+const CENTRIFUGO_URL = import.meta.env.VITE_CENTRIFUGO_URL;
+const SECRET = import.meta.env.VITE_CENTRIFUGO_SECRET;
 
 class CentrifugoService {
   constructor() {
@@ -400,16 +400,65 @@ export default {
 
 ## Environment Variables
 
-Create a `.env` file in your Vue.js project:
+### Development (.env.local)
 
-```
+Create a `.env.local` file in your Vue.js project root:
+
+```env
 VITE_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
+VITE_CENTRIFUGO_SECRET=Biyo_1_Secret_2025!
 VITE_API_URL=https://your-backend-api.com
 ```
 
-Update your service:
+### Production (.env.production)
+
+Create a `.env.production` file:
+
+```env
+VITE_CENTRIFUGO_URL=wss://biyo-websocket-server-jzdsc.ondigitalocean.app/connection/websocket
+VITE_CENTRIFUGO_SECRET=your_production_secret
+VITE_API_URL=https://your-production-api.com
+```
+
+### Add to .gitignore
+
+Make sure your `.gitignore` includes:
+
+```
+.env.local
+.env.*.local
+```
+
+This prevents accidental commits of secrets.
+
+### Using in Your Service
+
+The service automatically uses these variables:
+
 ```javascript
 const CENTRIFUGO_URL = import.meta.env.VITE_CENTRIFUGO_URL;
+const SECRET = import.meta.env.VITE_CENTRIFUGO_SECRET;
+```
+
+### Vite Configuration (vite.config.js)
+
+If you need to access environment variables in your Vite config:
+
+```javascript
+import { defineConfig, loadEnv } from 'vite';
+import vue from '@vitejs/plugin-vue';
+
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
+    plugins: [vue()],
+    define: {
+      __CENTRIFUGO_URL__: JSON.stringify(env.VITE_CENTRIFUGO_URL),
+      __CENTRIFUGO_SECRET__: JSON.stringify(env.VITE_CENTRIFUGO_SECRET),
+    }
+  };
+});
 ```
 
 ## Troubleshooting

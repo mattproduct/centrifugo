@@ -39,11 +39,11 @@ type = "redis"
   presence_ttl = "30s"
 
 [client]
-allowed_origins = [ "http://localhost:3000" ]
+allowed_origins = [ "*" ]
 ping_interval = "12s"
 
   [client.token]
-  jwks_public_endpoint = "https://example.com/jwks"
+  hmac_secret_key = "${CENTRIFUGO_TOKEN_SECRET}"
 
 [client.proxy.connect.http.static_headers]
 x = "y"
@@ -54,14 +54,21 @@ value = "y"
 
 [channel.without_namespace]
 presence = true
+publish = true
+subscribe = true
+join_leave = true
 
 [[channel.namespaces]]
 name = "ns1"
 presence = true
+publish = true
+subscribe = true
 
 [[channel.namespaces]]
 name = "ns2"
 presence = false
+publish = true
+subscribe = true
 
 [[proxies]]
 name = "ppp"

@@ -13,9 +13,9 @@
     }
   },
   "client": {
-    "allowed_origins": ["http://localhost:3000"],
+    "allowed_origins": ["*"],
     "token": {
-      "jwks_public_endpoint": "https://example.com/jwks"
+      "hmac_secret_key": "${CENTRIFUGO_TOKEN_SECRET}"
     },
     "ping_interval": "12s",
     "proxy": {
@@ -40,16 +40,23 @@
   },
   "channel": {
     "without_namespace": {
-        "presence": true
+        "presence": true,
+        "publish": true,
+        "subscribe": true,
+        "join_leave": true
     },
     "namespaces": [
       {
         "name": "ns1",
-        "presence": true
+        "presence": true,
+        "publish": true,
+        "subscribe": true
       },
       {
         "name": "ns2",
-        "presence": false
+        "presence": false,
+        "publish": true,
+        "subscribe": true
       }
     ]
   },
